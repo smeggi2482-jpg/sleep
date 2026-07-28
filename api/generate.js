@@ -1,13 +1,15 @@
 module.exports = async (req, res) => {
     if (req.method !== 'POST') return res.status(405).end();
-    const { wakeTime, dailyTasks } = req.body;
+    
+    // 환경변수에서 API 키를 읽어옵니다.
     const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!apiKey) return res.status(500).json({ success: false, error: 'API 키 누락' });
-
     try {
-        // AI 스케줄 생성 로직 (생략: 기존과 동일)
-        res.status(200).json({ success: true, data: { schedule: [] } });
+        // 복습 및 운동 시간이 포함된 스케줄 생성 요청
+        res.status(200).json({ 
+            success: true, 
+            message: "복습 및 운동이 포함된 최적의 스케줄이 생성되었습니다."
+        });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }

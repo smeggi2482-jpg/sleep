@@ -21,7 +21,6 @@
     </header>
 
     <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- 설정 영역 -->
         <section class="glass-card p-6 rounded-2xl h-fit">
             <form id="schedulerForm" onsubmit="handleSchedule(event)" class="space-y-4">
                 <div>
@@ -32,78 +31,81 @@
                         <option value="digital">디지털 알람</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs text-slate-300 mb-1">기상 희망 시간</label>
-                    <input type="time" id="wakeTime" value="07:00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1">기상 희망 시간</label>
+                        <input type="time" id="wakeTime" value="07:00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1">희망 취침 시간</label>
+                        <input type="time" id="sleepTime" value="23:00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white">
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-xs text-slate-300 mb-1">주요 할 일</label>
-                    <textarea id="dailyTasks" rows="3" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white"></textarea>
+                    <label class="block text-xs text-slate-300 mb-1">주요 할 일 (학습/업무)</label>
+                    <textarea id="dailyTasks" rows="3" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white" placeholder="예: 오전9시 학교, 오후6시 학원"></textarea>
                 </div>
                 <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-bold transition">스케줄 생성 시작</button>
             </form>
         </section>
 
-        <!-- 분석 대시보드 (추가됨) -->
         <section class="glass-card p-6 rounded-2xl">
             <h2 class="text-sm font-bold text-white mb-4"><i class="fa-solid fa-chart-line mr-2 text-indigo-400"></i>수면 건강 분석</h2>
-            <div id="stats" class="grid grid-cols-2 gap-4">
-                <div class="bg-slate-900 p-4 rounded-xl text-center">
-                    <p class="text-xs text-slate-400">예상 수면 효율</p>
-                    <p class="text-2xl font-bold text-indigo-400">92%</p>
-                </div>
-                <div class="bg-slate-900 p-4 rounded-xl text-center">
-                    <p class="text-xs text-slate-400">권장 취침 시간</p>
-                    <p class="text-2xl font-bold text-emerald-400">22:30</p>
-                </div>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-slate-900 p-4 rounded-xl text-center"><p class="text-xs text-slate-400">예상 수면 효율</p><p class="text-2xl font-bold text-indigo-400">92%</p></div>
+                <div class="bg-slate-900 p-4 rounded-xl text-center"><p class="text-xs text-slate-400">권장 취침 시간</p><p class="text-2xl font-bold text-emerald-400">22:30</p></div>
             </div>
-            <div class="mt-6 text-sm text-slate-400 space-y-2">
-                <p>• 자기 전 1시간은 스마트폰을 자제하세요.</p>
-                <p>• 규칙적인 운동은 수면의 질을 20% 높입니다.</p>
-                <p>• 오늘 복습 시간을 30분 확보하는 것이 좋습니다.</p>
+            <div class="text-sm text-slate-400 space-y-3">
+                <p>• <i class="fa-solid fa-check text-emerald-500 mr-2"></i>복습 완료 후 알람이 울립니다.</p>
+                <p>• <i class="fa-solid fa-check text-emerald-500 mr-2"></i>규칙적인 운동은 수면의 질을 높입니다.</p>
+                <p>• <i class="fa-solid fa-check text-emerald-500 mr-2"></i>취침 전 스마트폰을 자제하세요.</p>
             </div>
         </section>
 
-        <!-- 타임라인 -->
         <section id="timelineList" class="space-y-3">
             <p class="text-slate-500 text-center py-20">스케줄을 생성하면 이곳에 표시됩니다.</p>
         </section>
     </main>
 
     <script>
-        setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
-        }, 1000);
+        setInterval(() => document.getElementById('clock').innerText = new Date().toLocaleTimeString(), 1000);
 
-        let scheduledSleepTime = null;
+        function playAlarm(sound) {
+            alert("알람 작동 중: " + sound + " 선택됨! (이 알람은 설정한 시간에 울립니다)");
+        }
 
         async function handleSchedule(event) {
             event.preventDefault();
-            const body = {
-                wakeTime: document.getElementById('wakeTime').value,
-                dailyTasks: document.getElementById('dailyTasks').value
-            };
+            const wake = document.getElementById('wakeTime').value;
+            const sleep = document.getElementById('sleepTime').value;
+            const tasks = document.getElementById('dailyTasks').value;
+            
             const schedule = [
-                { time: "07:00", title: "기상 및 스트레칭", category: "운동", description: "가벼운 아침 스트레칭" },
-                { time: "09:00", title: "주요 일과", category: "일과", description: body.dailyTasks },
-                { time: "18:00", title: "오늘의 복습", category: "복습", description: "오늘 학습 내용 정리" },
-                { time: "22:00", title: "취침 시간", category: "일과", description: "알람 재생 예정" }
+                { time: wake, title: "기상 및 스트레칭", category: "운동", desc: "가벼운 아침 체조" },
+                { time: "09:00", title: "주요 일과", category: "일과", desc: tasks },
+                { time: "18:00", title: "오늘의 복습", category: "복습", desc: "학습 내용 복습 (완료 시 알람)" },
+                { time: sleep, title: "취침 시간", category: "일과", desc: "숙면을 위한 취침 (완료 시 알람)" }
             ];
-            scheduledSleepTime = "22:00"; 
-            renderTimeline(schedule);
-        }
 
-        function renderTimeline(schedule) {
             const container = document.getElementById('timelineList');
             container.innerHTML = schedule.map(item => `
                 <div class="glass-card p-4 rounded-xl flex gap-4 border-l-4 border-indigo-500">
                     <i class="fa-solid ${item.category === '운동' ? 'fa-dumbbell' : (item.category === '복습' ? 'fa-brain' : 'fa-calendar')} text-indigo-400"></i>
                     <div>
                         <p class="font-bold text-sm text-white">${item.title}</p>
-                        <p class="text-xs text-slate-400">${item.time} | ${item.description}</p>
+                        <p class="text-xs text-slate-400">${item.time} | ${item.desc}</p>
                     </div>
                 </div>
             `).join('');
+            
+            // Check alarms
+            const checkAlarms = setInterval(() => {
+                const now = new Date().toTimeString().substring(0, 5);
+                if (now === "18:00" || now === sleep) {
+                    playAlarm(document.getElementById('alarmSound').value);
+                    clearInterval(checkAlarms);
+                }
+            }, 60000);
         }
     </script>
 </body>
