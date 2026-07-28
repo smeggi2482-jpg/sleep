@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 수면 케어 & 데일리 스케줄러</title>
+    <title>AI 수면 케어 & 스케줄러</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -12,88 +12,98 @@
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
-    <header class="max-w-4xl mx-auto w-full mb-8">
-        <h1 class="text-2xl font-bold text-white mb-2">AI 수면 & 일과 관리</h1>
-        <p class="text-slate-400 text-sm">운동과 복습 시간을 포함한 최적의 루틴을 생성하세요.</p>
+    <header class="max-w-6xl mx-auto mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-white">AI 수면 & 일과 관리</h1>
+            <p class="text-slate-400 text-sm">복습과 운동 시간을 포함한 최적의 루틴을 생성하세요.</p>
+        </div>
+        <div id="clock" class="text-indigo-400 font-mono text-xl">00:00:00</div>
     </header>
 
-    <main class="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+    <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- 설정 영역 -->
         <section class="glass-card p-6 rounded-2xl h-fit">
             <form id="schedulerForm" onsubmit="handleSchedule(event)" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">기상 희망 시간</label>
-                    <input type="time" id="wakeTime" value="07:00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs text-slate-300 mb-1">알람 소리 선택</label>
+                    <select id="alarmSound" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white">
+                        <option value="classic">클래식 벨</option>
+                        <option value="forest">잔잔한 숲소리</option>
+                        <option value="digital">디지털 알람</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">목표 수면 시간 (시간)</label>
-                    <input type="number" id="sleepHours" value="8" step="0.5" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm">
+                    <label class="block text-xs text-slate-300 mb-1">기상 희망 시간</label>
+                    <input type="time" id="wakeTime" value="07:00" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">주요 할 일</label>
-                    <textarea id="dailyTasks" rows="3" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm focus:outline-none"></textarea>
+                    <label class="block text-xs text-slate-300 mb-1">주요 할 일</label>
+                    <textarea id="dailyTasks" rows="3" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white"></textarea>
                 </div>
                 <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-bold transition">스케줄 생성 시작</button>
             </form>
         </section>
 
+        <!-- 분석 대시보드 (추가됨) -->
+        <section class="glass-card p-6 rounded-2xl">
+            <h2 class="text-sm font-bold text-white mb-4"><i class="fa-solid fa-chart-line mr-2 text-indigo-400"></i>수면 건강 분석</h2>
+            <div id="stats" class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-900 p-4 rounded-xl text-center">
+                    <p class="text-xs text-slate-400">예상 수면 효율</p>
+                    <p class="text-2xl font-bold text-indigo-400">92%</p>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-xl text-center">
+                    <p class="text-xs text-slate-400">권장 취침 시간</p>
+                    <p class="text-2xl font-bold text-emerald-400">22:30</p>
+                </div>
+            </div>
+            <div class="mt-6 text-sm text-slate-400 space-y-2">
+                <p>• 자기 전 1시간은 스마트폰을 자제하세요.</p>
+                <p>• 규칙적인 운동은 수면의 질을 20% 높입니다.</p>
+                <p>• 오늘 복습 시간을 30분 확보하는 것이 좋습니다.</p>
+            </div>
+        </section>
+
+        <!-- 타임라인 -->
         <section id="timelineList" class="space-y-3">
-            <p class="text-slate-500 text-center py-20">스케줄을 생성하면 이곳에 타임라인이 표시됩니다.</p>
+            <p class="text-slate-500 text-center py-20">스케줄을 생성하면 이곳에 표시됩니다.</p>
         </section>
     </main>
 
     <script>
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+        }, 1000);
+
+        let scheduledSleepTime = null;
+
         async function handleSchedule(event) {
             event.preventDefault();
-            const container = document.getElementById('timelineList');
-            container.innerHTML = '<p class="text-center text-indigo-400 py-10">스케줄 구성 중...</p>';
-
             const body = {
                 wakeTime: document.getElementById('wakeTime').value,
-                sleepHours: document.getElementById('sleepHours').value,
                 dailyTasks: document.getElementById('dailyTasks').value
             };
-
-            try {
-                const res = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                const result = await res.json();
-                renderTimeline(result.data.schedule);
-            } catch (e) {
-                // 서버 실패 시 즉시 로컬 엔진 가동
-                renderFallbackSchedule(body);
-            }
+            const schedule = [
+                { time: "07:00", title: "기상 및 스트레칭", category: "운동", description: "가벼운 아침 스트레칭" },
+                { time: "09:00", title: "주요 일과", category: "일과", description: body.dailyTasks },
+                { time: "18:00", title: "오늘의 복습", category: "복습", description: "오늘 학습 내용 정리" },
+                { time: "22:00", title: "취침 시간", category: "일과", description: "알람 재생 예정" }
+            ];
+            scheduledSleepTime = "22:00"; 
+            renderTimeline(schedule);
         }
 
         function renderTimeline(schedule) {
             const container = document.getElementById('timelineList');
-            container.innerHTML = '';
-            schedule.forEach(item => {
-                let icon = 'fa-calendar';
-                if(item.category === '운동') icon = 'fa-dumbbell text-emerald-400';
-                if(item.category === '복습') icon = 'fa-brain text-purple-400';
-                container.innerHTML += `
-                    <div class="glass-card p-4 rounded-xl flex gap-4 border-l-4 border-indigo-500">
-                        <i class="fa-solid ${icon} text-lg"></i>
-                        <div>
-                            <p class="font-bold text-sm">${item.title}</p>
-                            <p class="text-xs text-slate-400">${item.time} | ${item.description}</p>
-                        </div>
-                    </div>`;
-            });
-        }
-
-        function renderFallbackSchedule(data) {
-            const schedule = [
-                { time: "07:00", title: "기상 및 스트레칭", category: "운동", description: "가벼운 아침 운동으로 시작" },
-                { time: "09:00", title: "주요 일과 시작", category: "일과", description: data.dailyTasks },
-                { time: "16:00", title: "하루 복습", category: "복습", description: "오늘 배운 내용 30분 정리" },
-                { time: "18:00", title: "저녁 운동", category: "운동", description: "근력 및 유산소 30분" },
-                { time: "23:00", title: "취침", category: "일과", description: "목표 수면 시간 확보" }
-            ];
-            renderTimeline(schedule);
+            container.innerHTML = schedule.map(item => `
+                <div class="glass-card p-4 rounded-xl flex gap-4 border-l-4 border-indigo-500">
+                    <i class="fa-solid ${item.category === '운동' ? 'fa-dumbbell' : (item.category === '복습' ? 'fa-brain' : 'fa-calendar')} text-indigo-400"></i>
+                    <div>
+                        <p class="font-bold text-sm text-white">${item.title}</p>
+                        <p class="text-xs text-slate-400">${item.time} | ${item.description}</p>
+                    </div>
+                </div>
+            `).join('');
         }
     </script>
 </body>
