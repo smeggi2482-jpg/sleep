@@ -2,13 +2,15 @@
  * Vercel Serverless Function: api/generate.js
  * 
  * Vercel 및 Node.js 서버리스 환경 호환 handler.
- * 동적 모델 탐색(ListModels) 및 자동 폴백(Fallback) 탑재.
+ * GEMINI_API_KEY 환경변수를 통해 안전하게 호출하며,
+ * 사용자의 기상 시간 및 목표 수면 시간을 역산하여
+ * 충분한 수면 시간을 보장하는 스케줄 JSON을 생성합니다.
  */
 
 const config = {
     api: {
         bodyParser: {
-            sizeLimit: '4mb'
+            sizeLimit: '2mb'
         }
     }
 };
@@ -36,47 +38,76 @@ async function handler(req, res) {
     if (!apiKey) {
         return res.status(500).json({ 
             success: false,
-            error: 'Vercel 서버 환경변수(GEMINI_API_KEY)가 설정되지 않았습니다. Vercel 대시보드의 Settings > Environment Variables에서 GEMINI_API_KEY를 추가 후 Redeploy 해주세요.' 
+            error: 'Vercel 서버 환경변수(GEMINI_API_KEY)가 설정되지 않았습니다. Vercel 대시보드 Settings > Environment Variables에서 GEMINI_API_KEY를 추가해주세요.' 
         });
     }
 
     try {
-        const { imageBase64, mimeType = 'image/jpeg', schoolInfo } = req.body || {};
+        const { wakeTime, sleepHours, dailyTasks, userCondition } = req.body || {};
 
-        if (!imageBase64) {
-            return res.status(400).json({ success: false, error: '분석할 이미지 데이터가 없습니다.' });
+        if (!wakeTime || !dailyTasks) {
+            return res.status(400).json({ success: false, error: '기상 시간과 할 일 데이터가 부족합니다.' });
         }
 
-        const systemInstruction = `당신은 학교 급식 및 음식 영양 분석을 전문으로 하는 국가 인증 AI 최고 영양사입니다.
-제공된 식단/급식 사진을 정밀하게 분석하여 각 음식 메뉴별 상세 정보와 전체 칼로리, 3대 영양소(탄수화물, 단백질, 지방) 및 나트륨/당류 수치를 추정하세요.
-학교 급식 영양 기준 및 교육부/식약처 영양 권장량을 바탕으로 식단의 영양 균형 점수(100점 만점)와 영양사 AI 특급 피드백을 제공합니다.`;
+        const systemInstruction = `당신은 최고 권위의 수면의학 전문의이자 AI 수면 케어 코치입니다.
+당신의 최우선 임무는 사용자가 목표로 하는 충분한 수면 시간(${sleepHours}시간)을 완전히 보장하는 것입니다.
+사용자가 제출한 기상 희망 시간(${wakeTime})에서 목표 수면 시간을 정확히 역산하여 목표 취침 시각(bedtime)과 취침 준비 시각(windDownTime)을 먼저 확정하고,
+그 제한시간 안에 오늘 해야 할 일들을 가장 효율적이고 스트레스 없는 순서로 배치하여 하루 전체 스케줄을 짜주세요.`;
 
-        const userPrompt = `이 사진은 급식 또는 음식 사진입니다.
-${schoolInfo ? `[참고 정보] 학교/식단 정보: ${schoolInfo}` : ''}
-사진에 나온 음식들을 식별하고 영양 성분을 분석하여 다음 JSON 구조로 응답하세요:
+        const userPrompt = `다음 사용자의 조건에 맞는 '수면 시간 보장 일과 스케줄'을 생성해 주세요.
+
+[사용자 입력 정보]
+- 목표 기상 시간: ${wakeTime}
+- 목표 수면 시간: ${sleepHours}시간
+- 오늘 할 일 및 일정:
+${dailyTasks}
+${userCondition ? `- 사용자 피로도/특이사항: ${userCondition}` : ''}
+
+반드시 다음 예시와 동일한 규격의 JSON 형식으로만 응답하세요:
 {
-  "mealTitle": "식단 한 줄 요약",
-  "totalCalories": 숫자(kcal),
-  "nutritionScore": 숫자(0~100),
-  "macronutrients": { "carbs": 숫자(g), "protein": 숫자(g), "fat": 숫자(g), "sodium": 숫자(mg), "sugar": 숫자(g) },
-  "items": [ { "name": "음식명", "portion": "제공량", "calories": 숫자, "category": "분류" } ],
-  "aiFeedback": { "summary": "총평", "warning": "주의점", "healthTip": "건강팁" }
+  "summary": "하루 수면 보장 플랜 한줄 요약",
+  "bedtime": "HH:MM",
+  "windDownTime": "HH:MM",
+  "wakeTime": "${wakeTime}",
+  "totalSleepHours": ${sleepHours},
+  "schedule": [
+    {
+      "time": "HH:MM - HH:MM",
+      "title": "일정 이름",
+      "category": "업무/운동/식사/휴식/수면준비/취침 등",
+      "description": "일정에 대한 상세 팁",
+      "isWindDown": false,
+      "isBedtime": false
+    },
+    {
+      "time": "22:00 - 22:30",
+      "title": "수면 준비 (전자기기 OFF, 암막 조성)",
+      "category": "수면준비",
+      "description": "멜라토닌 분비를 돕기 위한 준비 시간",
+      "isWindDown": true,
+      "isBedtime": false
+    },
+    {
+      "time": "22:30",
+      "title": "목표 취침 및 숙면 시작",
+      "category": "수면",
+      "description": "알람과 함께 취침에 듭니다.",
+      "isWindDown": false,
+      "isBedtime": true
+    }
+  ],
+  "sleepTips": [
+    "숙면을 위한 AI 코치 가이드 1",
+    "숙면을 위한 AI 코치 가이드 2",
+    "숙면을 위한 AI 코치 가이드 3"
+  ]
 }`;
 
-        // 기본 페이로드
         const basePayload = {
             contents: [
                 {
                     role: "user",
-                    parts: [
-                        { text: userPrompt },
-                        {
-                            inlineData: {
-                                mimeType: mimeType,
-                                data: imageBase64.replace(/^data:image\/\w+;base64,/, '')
-                            }
-                        }
-                    ]
+                    parts: [{ text: userPrompt }]
                 }
             ],
             systemInstruction: {
@@ -91,13 +122,12 @@ ${schoolInfo ? `[참고 정보] 학교/식단 정보: ${schoolInfo}` : ''}
         let candidateModels = [
             'gemini-2.5-flash',
             'gemini-2.0-flash',
-            'gemini-2.5-pro',
-            'gemini-2.0-flash-lite',
             'gemini-1.5-flash',
+            'gemini-2.5-pro',
             'gemini-1.5-pro'
         ];
 
-        // Google AI API에서 현재 사용자의 API Key로 호출 가능한 최신 모델 목록을 실시간 동적 조회
+        // Google AI API에서 현재 API 키로 이용 가능한 모델 동적 조회
         try {
             const listModelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
             const listRes = await fetch(listModelsUrl);
@@ -109,7 +139,6 @@ ${schoolInfo ? `[참고 정보] 학교/식단 정보: ${schoolInfo}` : ''}
                         .map(m => m.name.replace(/^models\//, ''));
 
                     if (validDynamicModels.length > 0) {
-                        // 속도와 성능이 뛰어난 모델(flash, pro 계열) 순으로 자동 정렬
                         const priorityKeywords = ['2.5-flash', '2.0-flash', 'flash', '2.5-pro', 'pro'];
                         validDynamicModels.sort((a, b) => {
                             const indexA = priorityKeywords.findIndex(kw => a.includes(kw));
@@ -144,37 +173,27 @@ ${schoolInfo ? `[참고 정보] 학교/식단 정보: ${schoolInfo}` : ''}
                 });
 
                 if (geminiRes.ok) {
-                    break; // 성공 시 탈출
+                    break;
                 }
 
                 const errText = await geminiRes.text();
                 modelAttemptErrors.push(`[${model}] (${geminiRes.status}): ${errText}`);
 
-                // API 키 자체의 권한/인증 오류(401, 403)인 경우 모델 변경이 의미없으므로 탈출
                 if (geminiRes.status === 401 || geminiRes.status === 403) {
                     lastErrorText = errText;
                     break;
                 }
             } catch (err) {
-                modelAttemptErrors.push(`[${model}] Network Error: ${err.message}`);
+                modelAttemptErrors.push(`[${model}] Error: ${err.message}`);
                 lastErrorText = err.message;
             }
         }
 
         if (!geminiRes || !geminiRes.ok) {
             console.error('Gemini API Error Log:', modelAttemptErrors);
-            
-            if (geminiRes?.status === 401 || geminiRes?.status === 403) {
-                return res.status(geminiRes.status).json({
-                    success: false,
-                    error: `Gemini API 인증 오류 (${geminiRes.status}): Vercel 환경변수 GEMINI_API_KEY가 올바른지 확인해주세요.`
-                });
-            }
-
-            const errorDetails = modelAttemptErrors.length > 0 ? modelAttemptErrors[modelAttemptErrors.length - 1] : lastErrorText;
             return res.status(geminiRes ? geminiRes.status : 500).json({ 
                 success: false,
-                error: `Gemini API 호출 실패: ${errorDetails || 'Google AI 서버와 통신할 수 없습니다.'}` 
+                error: `Gemini API 호출 실패: ${lastErrorText || 'Google AI API 서버에 연결할 수 없습니다.'}` 
             });
         }
 
@@ -182,10 +201,9 @@ ${schoolInfo ? `[참고 정보] 학교/식단 정보: ${schoolInfo}` : ''}
         const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!rawJsonText) {
-            return res.status(500).json({ success: false, error: 'AI 식단 분석 응답 결과를 생성하지 못했습니다.' });
+            return res.status(500).json({ success: false, error: 'AI 응답 결과를 생성하지 못했습니다.' });
         }
 
-        // 백틱 및 마크다운 코드블록 정밀 제거 후 안전한 JSON 파싱
         let parsedResult;
         try {
             const cleanJsonText = rawJsonText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -195,7 +213,7 @@ ${schoolInfo ? `[참고 정보] 학교/식단 정보: ${schoolInfo}` : ''}
             if (jsonMatch) {
                 parsedResult = JSON.parse(jsonMatch[0]);
             } else {
-                throw new Error('AI 응답 데이터를 규격화된 식단 정보로 파싱하지 못했습니다.');
+                throw new Error('AI 응답을 정규 스케줄 데이터로 파싱하지 못했습니다.');
             }
         }
 
