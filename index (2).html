@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 수면 케어 & 스케줄러</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0b0f19; color: #e2e8f0; }
+        .glass-card { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+    <!-- 로그인 모달 (상태값에 따라 전환) -->
+    <header class="max-w-6xl mx-auto mb-8 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-white">AI 수면 & 일과 관리</h1>
+        <div id="authSection">
+            <button onclick="toggleLoginModal()" class="px-4 py-2 bg-slate-800 rounded-xl text-sm hover:bg-slate-700">로그인 / 회원가입</button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- 기존 설정 영역 -->
+        <section class="glass-card p-6 rounded-2xl h-fit">
+            <form id="schedulerForm" class="space-y-4">
+                <!-- ... 기존 코드 ... -->
+                <button type="submit" class="w-full py-3 bg-indigo-600 rounded-xl font-bold text-sm">스케줄 생성 시작</button>
+            </form>
+        </section>
+
+        <!-- 회원 전용 게시판 -->
+        <section class="glass-card p-6 rounded-2xl col-span-2">
+            <h2 class="text-lg font-bold text-white mb-4"><i class="fa-solid fa-comments mr-2"></i>회원 전용 커뮤니티</h2>
+            <div id="boardContent" class="text-center py-10">
+                <p class="text-slate-500">로그인 후 게시판을 이용하실 수 있습니다.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- 로그인 모달 -->
+    <div id="loginModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4">
+        <div class="glass-card p-8 rounded-2xl w-full max-w-sm space-y-4">
+            <h2 class="text-xl font-bold text-white text-center">계정 연동</h2>
+            <button class="w-full py-2 bg-white text-black rounded-lg font-medium"><i class="fab fa-google mr-2"></i>Google 로그인</button>
+            <button class="w-full py-2 bg-black text-white border border-slate-700 rounded-lg font-medium"><i class="fab fa-apple mr-2"></i>Apple 로그인</button>
+            <button class="w-full py-2 bg-emerald-500 text-white rounded-lg font-medium"><i class="fa-solid fa-n mr-2"></i>Naver 로그인</button>
+            <button onclick="toggleLoginModal()" class="w-full text-slate-400 text-sm mt-2">닫기</button>
+        </div>
+    </div>
+
+    <script>
+        function toggleLoginModal() {
+            document.getElementById('loginModal').classList.toggle('hidden');
+        }
+        
+        // 로그인 성공 가정 시 게시판 로드
+        function loginSuccess() {
+            document.getElementById('boardContent').innerHTML = `
+                <div class="space-y-2">
+                    <div class="p-3 bg-slate-800 rounded-lg text-sm">오늘의 수면 팁 공유해요!</div>
+                    <div class="p-3 bg-slate-800 rounded-lg text-sm">운동 루틴 추천합니다.</div>
+                    <input class="w-full bg-slate-950 p-2 mt-4 rounded-lg" placeholder="댓글을 입력하세요...">
+                </div>
+            `;
+            document.getElementById('authSection').innerHTML = `<span class="text-indigo-400">사용자님 환영합니다!</span>`;
+            toggleLoginModal();
+        }
+    </script>
+</body>
+</html>
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyB0mEZBDMzfwCuc8pB61LM59uUZytvlGew",
+  authDomain: "goodnight-daa6f.firebaseapp.com",
+  projectId: "goodnight-daa6f",
+  storageBucket: "goodnight-daa6f.firebasestorage.app",
+  messagingSenderId: "975923971768",
+  appId: "1:975923971768:web:e9ea0c1557cec6b7e4164d"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+<!-- index.html 내부에 추가 -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  
+  // 로그인 버튼 클릭 시 실행할 함수 예시
+  window.loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      console.log("로그인 성공:", result.user);
+      loginSuccess(); // 기존 게시판 로드 함수
+    } catch (error) {
+      console.error("로그인 실패:", error);
+    }
+  };
+</script>
