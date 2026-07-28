@@ -2,9 +2,8 @@
  * Vercel Serverless Function: api/generate.js
  * 
  * Vercel 및 Node.js 서버리스 환경 호환 handler.
- * GEMINI_API_KEY 환경변수를 통해 안전하게 호출하며,
- * 사용자의 기상 시간 및 목표 수면 시간을 역산하여
- * 충분한 수면 시간을 보장하는 스케줄 JSON을 생성합니다.
+ * GEMINI_API_KEY 환경변수를 통해 안전하게 Gemini API를 호출하며,
+ * 기상 시각과 수면 희망 시간을 기준으로 타임라인 스케줄을 JSON으로 생성합니다.
  */
 
 const config = {
@@ -33,7 +32,6 @@ async function handler(req, res) {
         return res.status(405).json({ success: false, error: 'POST 요청만 지원합니다.' });
     }
 
-    // Vercel 환경변수 GEMINI_API_KEY 검증
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         return res.status(500).json({ 
@@ -50,9 +48,7 @@ async function handler(req, res) {
         }
 
         const systemInstruction = `당신은 최고 권위의 수면의학 전문의이자 AI 수면 케어 코치입니다.
-당신의 최우선 임무는 사용자가 목표로 하는 충분한 수면 시간(${sleepHours}시간)을 완전히 보장하는 것입니다.
-사용자가 제출한 기상 희망 시간(${wakeTime})에서 목표 수면 시간을 정확히 역산하여 목표 취침 시각(bedtime)과 취침 준비 시각(windDownTime)을 먼저 확정하고,
-그 제한시간 안에 오늘 해야 할 일들을 가장 효율적이고 스트레스 없는 순서로 배치하여 하루 전체 스케줄을 짜주세요.`;
+사용자가 입력한 기상 희망 시간(${wakeTime})과 목표 수면 시간(${sleepHours}시간)을 바탕으로 수면 시간을 확실하게 보장하는 타임라인 스케줄을 작성하세요.`;
 
         const userPrompt = `다음 사용자의 조건에 맞는 '수면 시간 보장 일과 스케줄'을 생성해 주세요.
 
@@ -98,8 +94,7 @@ ${userCondition ? `- 사용자 피로도/특이사항: ${userCondition}` : ''}
   ],
   "sleepTips": [
     "숙면을 위한 AI 코치 가이드 1",
-    "숙면을 위한 AI 코치 가이드 2",
-    "숙면을 위한 AI 코치 가이드 3"
+    "숙면을 위한 AI 코치 가이드 2"
   ]
 }`;
 
@@ -118,16 +113,12 @@ ${userCondition ? `- 사용자 피로도/특이사항: ${userCondition}` : ''}
             }
         };
 
-        // 기본 정적 후보 모델 리스트
         let candidateModels = [
-            'gemini-2.5-flash',
-            'gemini-2.0-flash',
             'gemini-1.5-flash',
-            'gemini-2.5-pro',
+            'gemini-2.0-flash',
             'gemini-1.5-pro'
         ];
 
-        // Google AI API에서 현재 API 키로 이용 가능한 모델 동적 조회
         try {
             const listModelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
             const listRes = await fetch(listModelsUrl);
@@ -139,14 +130,6 @@ ${userCondition ? `- 사용자 피로도/특이사항: ${userCondition}` : ''}
                         .map(m => m.name.replace(/^models\//, ''));
 
                     if (validDynamicModels.length > 0) {
-                        const priorityKeywords = ['2.5-flash', '2.0-flash', 'flash', '2.5-pro', 'pro'];
-                        validDynamicModels.sort((a, b) => {
-                            const indexA = priorityKeywords.findIndex(kw => a.includes(kw));
-                            const indexB = priorityKeywords.findIndex(kw => b.includes(kw));
-                            const rankA = indexA === -1 ? 99 : indexA;
-                            const rankB = indexB === -1 ? 99 : indexB;
-                            return rankA - rankB;
-                        });
                         candidateModels = Array.from(new Set([...validDynamicModels, ...candidateModels]));
                     }
                 }
@@ -157,7 +140,6 @@ ${userCondition ? `- 사용자 피로도/특이사항: ${userCondition}` : ''}
 
         let geminiRes = null;
         let lastErrorText = '';
-        let modelAttemptErrors = [];
 
         for (const model of candidateModels) {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -165,35 +147,22 @@ ${userCondition ? `- 사용자 피로도/특이사항: ${userCondition}` : ''}
             try {
                 geminiRes = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-goog-api-key': apiKey
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(basePayload)
                 });
 
-                if (geminiRes.ok) {
-                    break;
-                }
+                if (geminiRes.ok) break;
 
-                const errText = await geminiRes.text();
-                modelAttemptErrors.push(`[${model}] (${geminiRes.status}): ${errText}`);
-
-                if (geminiRes.status === 401 || geminiRes.status === 403) {
-                    lastErrorText = errText;
-                    break;
-                }
+                lastErrorText = await geminiRes.text();
             } catch (err) {
-                modelAttemptErrors.push(`[${model}] Error: ${err.message}`);
                 lastErrorText = err.message;
             }
         }
 
         if (!geminiRes || !geminiRes.ok) {
-            console.error('Gemini API Error Log:', modelAttemptErrors);
-            return res.status(geminiRes ? geminiRes.status : 500).json({ 
+            return res.status(500).json({ 
                 success: false,
-                error: `Gemini API 호출 실패: ${lastErrorText || 'Google AI API 서버에 연결할 수 없습니다.'}` 
+                error: `Gemini API 호출 실패: ${lastErrorText || 'Google AI API 서버 응답 없음'}` 
             });
         }
 
@@ -204,18 +173,8 @@ ${userCondition ? `- 사용자 피로도/특이사항: ${userCondition}` : ''}
             return res.status(500).json({ success: false, error: 'AI 응답 결과를 생성하지 못했습니다.' });
         }
 
-        let parsedResult;
-        try {
-            const cleanJsonText = rawJsonText.replace(/```json/gi, '').replace(/```/g, '').trim();
-            parsedResult = JSON.parse(cleanJsonText);
-        } catch (parseErr) {
-            const jsonMatch = rawJsonText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                parsedResult = JSON.parse(jsonMatch[0]);
-            } else {
-                throw new Error('AI 응답을 정규 스케줄 데이터로 파싱하지 못했습니다.');
-            }
-        }
+        const cleanJsonText = rawJsonText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsedResult = JSON.parse(cleanJsonText);
 
         return res.status(200).json({
             success: true,
@@ -223,7 +182,6 @@ ${userCondition ? `- 사용자 피로도/특이사항: ${userCondition}` : ''}
         });
 
     } catch (error) {
-        console.error('Server Internal Error:', error);
         return res.status(500).json({ 
             success: false,
             error: error.message || '서버 내부 처리 중 오류가 발생했습니다.' 
